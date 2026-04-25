@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ICYMOTO.COM — Coming Soon</title>
+  <meta name="description" content="ICYMOTO — The future of Media & Advertising. Coming Soon." />
+
+  <!-- FONTS: preconnect opens TCP early, media="print" trick loads without blocking render -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@300;400;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Space+Mono&display=swap"
+    rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@300;400;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Space+Mono&display=swap" rel="stylesheet" />
+  </noscript>
+
+  <!--
+    RESPONSIVE IMAGE PRELOAD: Browser fetches the right size at highest priority
+    before it even encounters the <picture> element in the body.
+    This is the single biggest LCP improvement possible.
+  -->
+  <link rel="preload" as="image" href="earth-mobile.webp"  media="(max-width: 768px)"   fetchpriority="high" />
+  <link rel="preload" as="image" href="earth-tablet.webp"  media="(min-width: 769px) and (max-width: 1279px)" fetchpriority="high" />
+  <link rel="preload" as="image" href="earth-desktop.webp" media="(min-width: 1280px)"  fetchpriority="high" />
+
+  <style>
+    /* ════════════════════════════════════════════════
+       DESIGN TOKENS
+    ════════════════════════════════════════════════ */
+    :root {
+      /*
+        Horizon is at exactly 49.6% from the image top.
+        We measured this by finding the peak orange-glow row
+        in the source image (row 1072 of 2160px).
+        object-position: center 49.6% keeps this anchored
+        at 49.6% of the viewport on EVERY device and ratio.
+      */
+      --horizon: 60%;
+
+      /* Space between the text block's bottom and the horizon */
+      --gap-above-horizon: 4vh;
+
+      --clr-accent-red:  rgba(255,  55,   0, 0.9);
+      --clr-accent-blue: rgba( 60, 160, 255, 0.28);
+      --clr-text-hi:     rgba(255, 255, 255, 0.92);
+      --clr-text-mid:    rgba(255, 255, 255, 0.52);
+      --clr-text-lo:     rgba(255, 255, 255, 0.38);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;   /* dvh fixes iOS Safari address-bar overflow */
+      overflow: hidden;
+      background: #000; /* Black shown while image loads — matches space in image */
+    }
+
+    /* ════════════════════════════════════════════════
+       BACKGROUND — <picture> element
+       
+       WHY <picture> over CSS background-image:
+       - Browser picks the right format (WebP vs JPEG) natively
+       - Browser picks the right resolution for the device
+       - Works in sync with <link rel="preload"> in <head>
+       - object-fit: cover + object-position replaces
+         background-size: cover + background-position exactly
+    ════════════════════════════════════════════════ */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+    }
+    .bg-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      /*
+        KEY: object-position keeps the horizon at 49.6% of viewport
+        height regardless of screen width or aspect ratio.
+        Without this, cover crops the image differently per device
+        and the horizon line jumps unpredictably.
+      */
+      object-position: center var(--horizon);
+      display: block;
+    }
+
+    /* ─── Vignette depth ─── */
+    .vignette {
+      position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background: radial-gradient(ellipse at center,
+        transparent 18%,
+        rgba(0,0,6,0.45) 60%,
+        rgba(0,0,8,0.90) 100%
+      );
+    }
+
+    /* ─── Scanlines texture ─── */
+    .scanlines {
+      position: fixed; inset: 0; z-index: 3; pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+      );
+    }
+
+    /* ─── Scene ─── */
+    .scene { position: fixed; inset: 0; z-index: 10; }
+
+    /* ─── Domain label ─── */
+    .domain {
+      position: absolute;
+      top: max(24px, calc(env(safe-area-inset-top, 0px) + 20px));
+      width: 100%;
+      text-align: center;
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(11px, 1.4vw, 18px);
+      letter-spacing: clamp(4px, 1.5vw, 7px);
+      color: var(--clr-text-lo);
+      text-transform: uppercase;
+      opacity: 0;
+      animation: fadeSlideDown 1.4s cubic-bezier(0.22,1,0.36,1) 0.3s forwards;
+    }
+
+    /* ════════════════════════════════════════════════
+       HORIZON CONTENT — text anchored ABOVE the horizon
+
+       bottom = (100% - 49.6%) + gap = 50.4% + gap
+
+       This pins the BOTTOM EDGE of the content block to
+       just above the orange glow on every single device.
+       The text grows UPWARD into the space region.
+    ════════════════════════════════════════════════ */
+    .horizon-content {
+      position: absolute;
+      bottom: calc((100% - var(--horizon)) + var(--gap-above-horizon));
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(12px, 2.5vh, 28px);
+      padding: 0 clamp(16px, 5vw, 48px);
+    }
+
+    /* ─── Heading ─── */
+    .coming-soon {
+      font-family: 'Cormorant SC', serif;
+      font-weight: 500;
+      font-size: clamp(36px, 7.5vw, 92px);
+      letter-spacing: clamp(4px, 2vw, 24px);
+      line-height: 1;
+      white-space: nowrap;
+      text-align: center;
+      opacity: 0;
+      animation: fadeSlideDown 1.6s cubic-bezier(0.22,1,0.36,1) 0.9s forwards;
+      background: linear-gradient(175deg,
+        rgba(230,242,255,1)      0%,
+        rgba(255,255,255,1)     35%,
+        rgba(210,232,255,1)     65%,
+        rgba(180,220,255,0.88) 100%
+      );
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 32px rgba(110,175,255,0.35));
+    }
+
+    /* ─── CTA group ─── */
+    .cta-area {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 30px;
+      opacity: 0;
+      animation: fadeIn 2s ease 1.5s forwards;
+    }
+
+    /* ─── Button: min-height 48px = WCAG 2.5.8 touch target ─── */
+    .btn-notify {
+      position: relative;
+      font-family: 'Cormorant SC', serif;
+      font-size: clamp(15px, 1.8vw, 23px);
+      font-weight: 600; letter-spacing: 5px; text-transform: uppercase;
+      color: var(--clr-text-hi);
+      background: rgba(255,255,255,0.04);
+      border: 4px solid rgba(255,255,255,0.2);
+      padding: 13px clamp(24px, 4vw, 44px);
+      min-height: 48px; min-width: 200px;
+      cursor: pointer;
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      transition: border-color .35s, box-shadow .35s, transform .35s;
+      overflow: hidden;
+    }
+    .btn-notify::before {
+      content:''; position:absolute; inset:0; pointer-events:none;
+      background:linear-gradient(135deg,rgba(255,35,0,.15),rgba(0,160,255,.06));
+      opacity:0; transition:opacity .35s;
+    }
+    .btn-notify::after {
+      content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+      pointer-events:none;
+      background:linear-gradient(to right,transparent,rgba(255,65,0,.9),transparent);
+      transform:scaleX(.4); opacity:.5; transition:transform .4s,opacity .4s;
+    }
+    .btn-notify:hover,.btn-notify:focus-visible {
+      border-color:rgba(255,70,0,.55);
+      box-shadow:0 0 26px rgba(255,35,0,.28),0 0 55px rgba(255,18,0,.1);
+      transform:translateY(-2px); outline:none;
+    }
+    .btn-notify:hover::before,.btn-notify:focus-visible::before{opacity:1;}
+    .btn-notify:hover::after,.btn-notify:focus-visible::after{transform:scaleX(1);opacity:1;}
+
+    /* ─── Tagline ─── */
+    .tagline {
+      font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:900;
+      font-size:clamp(13px,1.5vw,18px); letter-spacing:2.5px;
+      color:var(--clr-text-mid); text-align:center; max-width:90vw;
+    }
+
+    /* ════════════════════════════════════════════════
+       MODAL
+    ════════════════════════════════════════════════ */
+    .modal-overlay {
+      position:fixed; inset:0; z-index:200;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.74);
+      backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+      opacity:0; visibility:hidden; pointer-events:none;
+      transition:opacity .4s,visibility .4s;
+    }
+    .modal-overlay.open{opacity:1;visibility:visible;pointer-events:all;}
+
+    .modal {
+      position:relative; width:min(480px,92vw);
+      background:rgba(4,4,12,.97); border:1px solid rgba(255,255,255,.08);
+      padding:clamp(28px,5vw,52px) clamp(20px,5vw,46px) clamp(24px,4vw,44px);
+      text-align:center;
+      transform:translateY(22px) scale(.96);
+      transition:transform .45s cubic-bezier(.22,1,.36,1);
+      overflow-y:auto; max-height:90dvh;
+    }
+    .modal-overlay.open .modal{transform:translateY(0) scale(1);}
+    .modal::before{content:'';position:absolute;top:0;left:0;width:26px;height:26px;border:1px solid var(--clr-accent-red);border-width:1px 0 0 1px;}
+    .modal::after {content:'';position:absolute;bottom:0;right:0;width:26px;height:26px;border:1px solid var(--clr-accent-red);border-width:0 1px 1px 0;}
+    .c-tr{position:absolute;top:0;right:0;width:26px;height:26px;border:1px solid var(--clr-accent-blue);border-width:1px 1px 0 0;}
+    .c-bl{position:absolute;bottom:0;left:0;width:26px;height:26px;border:1px solid var(--clr-accent-blue);border-width:0 0 1px 1px;}
+    .modal-topline{position:absolute;top:0;left:15%;right:15%;height:1px;background:linear-gradient(to right,transparent,rgba(255,55,0,.9),transparent);box-shadow:0 0 12px rgba(255,40,0,.55);}
+    .modal h2{font-family:'Cormorant SC',serif;font-weight:600;font-size:18px;letter-spacing:5px;color:var(--clr-text-hi);margin-bottom:10px;}
+    .modal .sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;letter-spacing:1.5px;color:rgba(255,255,255,.36);margin-bottom:28px;}
+    .modal-close{position:absolute;top:13px;right:17px;background:none;border:none;color:rgba(255,255,255,.22);font-size:16px;cursor:pointer;font-family:monospace;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;transition:color .2s;}
+    .modal-close:hover,.modal-close:focus-visible{color:rgba(255,70,0,.8);outline:none;}
+
+    .email-row{display:flex;border:1px solid rgba(255,255,255,.13);overflow:hidden;}
+    .email-input{
+      flex:1;background:rgba(255,255,255,.04);border:none;outline:none;
+      padding:14px 18px;
+      font-family:'Cormorant Garamond',serif;
+      font-size:16px; /* Must be ≥ 16px — iOS Safari zooms inputs below this */
+      letter-spacing:1px;color:#fff;
+      -webkit-appearance:none;appearance:none;border-radius:0;
+    }
+    .email-input::placeholder{color:rgba(255,255,255,.22);}
+    .email-submit{
+      background:linear-gradient(135deg,rgba(200,30,0,.9),rgba(155,12,0,1));
+      border:none;padding:14px 22px;
+      font-family:'Cormorant SC',serif;font-size:11px;font-weight:600;letter-spacing:3px;color:#fff;
+      cursor:pointer;white-space:nowrap;min-height:48px;
+      transition:background .3s,box-shadow .3s;
+    }
+    .email-submit:hover,.email-submit:focus-visible{
+      background:linear-gradient(135deg,rgba(230,50,0,1),rgba(185,18,0,1));
+      box-shadow:0 0 22px rgba(255,40,0,.45);outline:none;
+    }
+    .email-submit.loading{opacity:.6;cursor:not-allowed;pointer-events:none;}
+    .err-msg{margin-top:10px;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;letter-spacing:1px;color:rgba(255,80,0,.85);display:none;}
+    .success-area{display:none;flex-direction:column;align-items:center;gap:16px;padding:8px 0;}
+    .success-icon{width:52px;height:52px;border-radius:50%;border:1px solid rgba(255,70,0,.4);display:flex;align-items:center;justify-content:center;font-size:22px;color:rgba(255,120,0,.9);animation:iconPop .5s cubic-bezier(.22,1,.36,1);}
+    .success-area p{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;letter-spacing:2px;color:rgba(255,255,255,.42);}
+
+    /* ════════════════════════════════════════════════
+       KEYFRAMES
+    ════════════════════════════════════════════════ */
+    @keyframes fadeSlideDown{from{opacity:0;transform:translateY(-18px);}to{opacity:1;transform:translateY(0);}}
+    @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+    @keyframes iconPop{from{transform:scale(.4);opacity:0;}to{transform:scale(1);opacity:1;}}
+
+    /* ════════════════════════════════════════════════
+       RESPONSIVE BREAKPOINTS — Mobile-first
+    ════════════════════════════════════════════════ */
+
+    /* Tiny phones < 380px */
+    @media (max-width: 379px) {
+      .coming-soon { font-size: clamp(26px,9vw,34px); letter-spacing:3px; white-space:normal; }
+      .email-row   { flex-direction:column; border:none; }
+      .email-input { border:1px solid rgba(255,255,255,.13); width:100%; margin-bottom:10px; border-radius:0; }
+      .email-submit{ width:100%; }
+    }
+
+    /* Portrait phones 380–768px */
+    @media (max-width: 768px) {
+      :root { --gap-above-horizon: 2.5vh; }
+    }
+
+    /* Landscape phones (short) */
+    @media (max-height: 480px) and (orientation: landscape) {
+      :root { --gap-above-horizon: 1vh; }
+      .coming-soon { font-size: clamp(20px,5vh,38px); letter-spacing:3px; }
+      .cta-area    { gap: 8px; }
+      .domain      { top: 8px; }
+    }
+
+    /* Tablet 769–1279px */
+    @media (min-width: 769px) and (max-width: 1279px) {
+      :root { --gap-above-horizon: 3.5vh; }
+    }
+
+    /* Desktop 1280px+ */
+    @media (min-width: 1280px) {
+      :root { --gap-above-horizon: 4vh; }
+    }
+
+    /* Reduced motion — WCAG 2.3.3 */
+    @media (prefers-reduced-motion: reduce) {
+      *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+      .domain,.coming-soon,.cta-area { opacity:1; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!--
+    BACKGROUND <picture> element:
+    • Delivers the right format (WebP with JPEG fallback)
+    • Delivers the right size (mobile 13KB / tablet 27KB / desktop 101KB)
+    • object-position: center 49.6% keeps the horizon locked to
+      exactly 49.6% from the viewport top on every screen size
+  -->
+  <picture class="bg" aria-hidden="true">
+    <source media="(max-width: 768px)"                        srcset="earth-mobile.webp"  type="image/webp" width="768"  height="432"  />
+    <source media="(min-width: 769px) and (max-width: 1279px)" srcset="earth-tablet.webp"  type="image/webp" width="1024" height="576"  />
+    <source media="(min-width: 1280px)"                       srcset="earth-desktop.webp" type="image/webp" width="1920" height="1080" />
+    <img src="earth-fallback.jpg" alt="" class="bg-img" width="1920" height="1080" decoding="async" fetchpriority="high" />
+  </picture>
+
+  <div class="vignette"  aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <div class="scene">
+    <header role="banner">
+      <p class="domain">ICYMOTO.COM</p>
+    </header>
+
+    <!--
+      horizon-content bottom edge is pinned just above the horizon line.
+      Text grows upward into the space region of the image.
+    -->
+    <main class="horizon-content">
+      <h1 class="coming-soon">Coming Soon</h1>
+      <div class="cta-area">
+        <button class="btn-notify" onclick="openModal()" aria-haspopup="dialog" aria-label="Get notified when ICYMOTO launches">
+          Get Notified
+        </button>
+        <p class="tagline">The future of Media &amp; Advertising is Here</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalHeading" onclick="bgClose(event)">
+    <div class="modal">
+      <div class="modal-topline" aria-hidden="true"></div>
+      <div class="c-tr" aria-hidden="true"></div>
+      <div class="c-bl" aria-hidden="true"></div>
+      <button class="modal-close" onclick="closeModal()" aria-label="Close modal">✕</button>
+
+      <div id="formArea">
+        <h2 id="modalHeading">Be First to Know</h2>
+        <p class="sub">Enter your email — we'll reach out before launch.</p>
+        <div class="email-row">
+          <label for="emailInput" style="position:absolute;width:1px;height:1px;clip:rect(0,0,0,0);overflow:hidden;white-space:nowrap">Email address</label>
+          <input class="email-input" id="emailInput" type="email" placeholder="your@email.com"
+            autocomplete="email" inputmode="email" aria-required="true" aria-describedby="errMsg" />
+          <button class="email-submit" id="submitBtn" onclick="submitEmail()">Notify Me</button>
+        </div>
+        <p class="err-msg" id="errMsg" role="alert" aria-live="polite"></p>
+      </div>
+
+      <div class="success-area" id="successArea" aria-live="polite">
+        <div class="success-icon" aria-hidden="true">✦</div>
+        <h2>You're on the List</h2>
+        <p>We'll be in touch before the world is ready!</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ══════════════════════════════════════════════════
+       SUPABASE CONFIG
+       1. Go to supabase.com → your project → Settings → API
+       2. Paste "Project URL" into SUPABASE_URL
+       3. Paste "anon / public" key into SUPABASE_ANON_KEY
+    ══════════════════════════════════════════════════ */
+    const SUPABASE_URL      = 'https://legurnsxtwicikthiijm.supabase.co/rest/v1/';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlZ3VybnN4dHdpY2lrdGhpaWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NTc5MjIsImV4cCI6MjA5MTEzMzkyMn0.h_Poo6V8bdBJsmybrAkXSBtV69OmOlEmHlmZL87m33o';
+
+    /* Modal */
+    const modalEl     = document.getElementById('modal');
+    const emailInput  = document.getElementById('emailInput');
+    const errMsg      = document.getElementById('errMsg');
+    const submitBtn   = document.getElementById('submitBtn');
+    const formArea    = document.getElementById('formArea');
+    const successArea = document.getElementById('successArea');
+
+    function openModal()  { modalEl.classList.add('open'); setTimeout(() => emailInput.focus(), 440); }
+    function closeModal() { modalEl.classList.remove('open'); }
+    function bgClose(e)   { if (e.target === modalEl) closeModal(); }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalEl.classList.contains('open')) closeModal(); });
+
+    /* Submit */
+    async function submitEmail() {
+      const val = emailInput.value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        errMsg.textContent = 'Please enter a valid email address.';
+        errMsg.style.display = 'block'; emailInput.focus(); return;
+      }
+      errMsg.style.display = 'none';
+      submitBtn.textContent = '...'; submitBtn.classList.add('loading');
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/waitlist`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({ email: val })
+        });
+        if (!res.ok) throw new Error(res.status === 409 ? 'duplicate' : `HTTP ${res.status}`);
+
+        formArea.style.display = 'none';
+        successArea.style.display = 'flex';
+        setTimeout(() => {
+          closeModal();
+          setTimeout(() => {
+            successArea.style.display = 'none'; formArea.style.display = 'block';
+            emailInput.value = ''; submitBtn.textContent = 'Notify Me'; submitBtn.classList.remove('loading');
+          }, 500);
+        }, 3000);
+      } catch (err) {
+        errMsg.textContent = err.message === 'duplicate' ? 'That email is already on the list!' : 'Something went wrong — please try again.';
+        errMsg.style.display = 'block'; submitBtn.textContent = 'Notify Me'; submitBtn.classList.remove('loading');
+      }
+    }
+    emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitEmail(); });
+  </script>
+</body>
+</html>
